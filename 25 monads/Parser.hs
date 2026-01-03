@@ -51,11 +51,23 @@ parseAtom (Minus : Nat n : rest) = Right (rest, Val (negate n))
 parseAtom (Minus : rest)         = Left (IntNotFound (mHead rest))
 parseAtom toks                      = Left (ExprNotFound (mHead toks))
 
-parseTerm :: Parser Expr
 
+parseE :: Parser Expr -> Token -> (Expr -> Expr -> Expr) -> Parser Expr 
+parseE parser token constructor toks = do
+  (toks',term) <- parser toks
+  parseE' term toks'
+  where 
+    parseE' acc (tok : rest)
+      | tok == token = do
+        (toks',term) <- parser rest 
+        parseE' (constructor acc term) toks'
+    parseE' acc tokens = Right (tokens,acc)
+
+parseTerm :: Parser Expr
+parseTerm = parseE parseAtom Times Mul 
 
 parseExpr :: Parser Expr
-parseExpr = parseTerm
+parseExpr = parseE parseTerm Plus Add 
 
 parseStmt :: Parser Stmt
 parseStmt  (Ident v : Eq : rest) = do
@@ -64,8 +76,19 @@ parseStmt  (Ident v : Eq : rest) = do
     
 parseStmt toks = Left (StmtNotFound (mHead toks))
 
-parseBlock :: Parser Block
-parseBlock = undefined
 
+parseBlock :: Parser Block
+parseBlock block = do 
+  (tokens,statement) <- parseStmt block
+  parseBlock' [statement] tokens 
+    where
+      parseBlock' acc (Semi : restTokens) = do 
+        (tokens',statement') <- parseStmt restTokens 
+        parseBlock' (acc ++ [statement']) tokens' 
+      parseBlock' acc tokens = Right (tokens,acc)
+     
 parse :: String -> Either Error Program
-parse input = undefined
+parse input = do 
+  tokens <- tokenise input 
+  (inputText,block) <- parseBlock tokens 
+  
