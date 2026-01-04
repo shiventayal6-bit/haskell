@@ -89,16 +89,30 @@ parseAnagram xs
 -- split2M the arg, check for anag ind, if anag ind then anagram [p1] "p2"
   --  
 parseReversal :: [String] -> [ParseTree]
-parseReversal
-  = const []
+parseReversal ws 
+  = [Reversal ind t | (ind, arg) <- split2M ws,
+                      unwords ind `elem` reversalIndicators,
+                      t <- parseWordplay arg]
 
 parseInsertion :: [String] -> [ParseTree]
-parseInsertion
-  = const []
+parseInsertion s =
+  [Insertion ws t t' | (arg, ws, arg') <- splits,
+    unwords ws `elem` insertionIndicators,
+    t <- parseWordplay arg, t' <- parseWordplay arg'] ++
+  [Insertion ws t' t | (arg, ws, arg') <- splits,
+    unwords ws `elem` envelopeIndicators,
+    t <- parseWordplay arg, t' <- parseWordplay arg']
+  where splits = split3 s 
 
 parseCharade :: [String] -> [ParseTree]
-parseCharade
-  = const []
+parseCharade s = 
+  [Charade ws t t' | (arg, ws, arg') <- splits,
+    unwords ws `elem` beforeIndicators,
+    t <- parseWordplay arg, t' <- parseWordplay arg'] ++
+  [Charade ws t' t | (arg, ws, arg') <- splits,
+    unwords ws `elem` afterIndicators,
+    t <- parseWordplay arg, t' <- parseWordplay arg']
+  where splits = split3 s
 
 -- Given...
 parseClue :: Clue -> [Parse]
@@ -106,12 +120,13 @@ parseClue clue@(s, n)
   = parseClueText (words (cleanUp s))
 
 parseClueText :: [String] -> [Parse]
-parseClueText
-  = undefined
+parseClueText s = [(def,link,t)| (def,link,wp) <- split3M s,
+  unwords link `elem` linkWords, not $ null $ synonyms $ unwords def,
+  t <- parseWordplay wp]
 
 solve :: Clue -> [Solution]
-solve
-  = undefined
+solve clue@(_, n) = [(clue, parse, s) | parse <- parseClue clue,
+  s <- evaluate parse n, not $ null s]
 
 
 ------------------------------------------------------
