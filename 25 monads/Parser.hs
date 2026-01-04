@@ -49,8 +49,12 @@ parseAtom (Ident x : rest)       = Right (rest, Var x)
 parseAtom (Nat n : rest)         = Right (rest, Val n)
 parseAtom (Minus : Nat n : rest) = Right (rest, Val (negate n))
 parseAtom (Minus : rest)         = Left (IntNotFound (mHead rest))
+parseAtom (LParen : toks) = do 
+  (toks',expr) <- parseExpr toks
+  toks'' <- checkTok RParen toks' 
+  return (toks'',expr)
 parseAtom toks                      = Left (ExprNotFound (mHead toks))
-
+ 
 
 parseE :: Parser Expr -> Token -> (Expr -> Expr -> Expr) -> Parser Expr 
 parseE parser token constructor toks = do
@@ -69,11 +73,17 @@ parseTerm = parseE parseAtom Times Mul
 parseExpr :: Parser Expr
 parseExpr = parseE parseTerm Plus Add 
 
+
 parseStmt :: Parser Stmt
-parseStmt  (Ident v : Eq : rest) = do
-        (remaining, expr) <- parseExpr rest
-        return (remaining, Asgn v expr)
-    
+parseStmt ((Ident v) : Eq : toks) = do
+  (toks', expr) <- parseExpr toks
+  return (toks', Asgn v expr)
+parseStmt (WhileTok : toks) = do
+  (toks', expr) <- parseExpr toks
+  toks'' <- checkTok LBrace toks'
+  (toks''', block) <- parseBlock toks''
+  toks'''' <- checkTok RBrace toks'''
+  return (toks'''', While expr block)
 parseStmt toks = Left (StmtNotFound (mHead toks))
 
 
@@ -87,8 +97,10 @@ parseBlock block = do
         parseBlock' (acc ++ [statement']) tokens' 
       parseBlock' acc tokens = Right (tokens,acc)
      
-parse :: String -> Either Error Program
+parse :: String -> Either Error Program 
 parse input = do 
   tokens <- tokenise input 
-  (inputText,block) <- parseBlock tokens 
-  
+  (tokens',block) <- parseBlock tokens 
+  case tokens' of 
+    [] -> Right block 
+    ts -> Left (UnparsedInput ts )
